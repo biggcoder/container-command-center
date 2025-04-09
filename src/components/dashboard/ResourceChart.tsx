@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
-import { Card as RechartsCard, ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
+import { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
 import { cn } from '@/lib/utils';
 
 interface ResourceChartProps {

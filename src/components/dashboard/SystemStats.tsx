@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Cpu, HardDrive, Memory, Zap } from 'lucide-react';
+import { Cpu, Database, HardDrive, Zap } from 'lucide-react';
 import { StatusCard } from './StatusCard';
 
 interface SystemStatsProps {
@@ -45,7 +45,7 @@ export function SystemStats({
       <StatusCard 
         title="Memory Usage" 
         value={`${memoryUsed}GB / ${memoryTotal}GB`}
-        icon={<Memory />} 
+        icon={<Database />} 
         trend="neutral"
         trendValue="±0%"
       />
