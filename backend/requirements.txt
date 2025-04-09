@@ -1,0 +1,8 @@
+
+flask==2.2.3
+flask-socketio==5.3.3
+flask-cors==3.0.10
+eventlet==0.33.3
+psutil==5.9.4
+docker==6.1.1
+python-dotenv==1.0.0
