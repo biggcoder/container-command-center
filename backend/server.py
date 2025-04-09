@@ -9,6 +9,7 @@ import threading
 
 from monitor import SystemMonitor
 from container_utils import ContainerManager
+from mini_docker_utils import mini_docker_manager
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -50,14 +51,16 @@ def background_monitoring():
     """Background thread to emit system stats every second"""
     while True:
         system_stats = system_monitor.get_stats()
-        containers = container_manager.list_containers_with_stats()
+        docker_containers = container_manager.list_containers_with_stats()
+        mini_containers = mini_docker_manager.list_containers()
         
         # Update history
         update_history(system_stats)
         
         # Emit data via WebSocket
         socketio.emit('system_stats', system_stats)
-        socketio.emit('containers', containers)
+        socketio.emit('docker_containers', docker_containers)
+        socketio.emit('mini_containers', mini_containers)
         
         eventlet.sleep(1)
 
@@ -82,41 +85,91 @@ def get_disk():
 def get_history():
     return jsonify(history_buffer)
 
+# Docker container routes
 @app.route('/api/containers', methods=['GET'])
 def get_containers():
-    return jsonify(container_manager.list_containers())
+    # Get runtime type from query params (default to docker)
+    runtime = request.args.get('runtime', 'docker')
+    
+    if runtime == 'mini':
+        return jsonify(mini_docker_manager.list_containers())
+    else:
+        return jsonify(container_manager.list_containers())
 
 @app.route('/api/containers/<container_id>/start', methods=['POST'])
 def start_container(container_id):
-    result = container_manager.start_container(container_id)
-    return jsonify({"success": result})
+    # Get runtime type from request body
+    data = request.get_json() or {}
+    runtime = data.get('runtime', 'docker')
+    
+    if runtime == 'mini':
+        result = mini_docker_manager.start_container(container_id)
+    else:
+        result = container_manager.start_container(container_id)
+        
+    return jsonify(result)
 
 @app.route('/api/containers/<container_id>/stop', methods=['POST'])
 def stop_container(container_id):
-    result = container_manager.stop_container(container_id)
-    return jsonify({"success": result})
+    # Get runtime type from request body
+    data = request.get_json() or {}
+    runtime = data.get('runtime', 'docker')
+    
+    if runtime == 'mini':
+        result = mini_docker_manager.stop_container(container_id)
+    else:
+        result = container_manager.stop_container(container_id)
+        
+    return jsonify(result)
 
 @app.route('/api/containers/<container_id>/delete', methods=['DELETE'])
 def delete_container(container_id):
-    result = container_manager.delete_container(container_id)
-    return jsonify({"success": result})
+    # Get runtime type from query params
+    runtime = request.args.get('runtime', 'docker')
+    
+    if runtime == 'mini':
+        result = mini_docker_manager.delete_container(container_id)
+    else:
+        result = container_manager.delete_container(container_id)
+        
+    return jsonify(result)
 
 @app.route('/api/containers/<container_id>/logs', methods=['GET'])
 def get_logs(container_id):
-    logs = container_manager.get_container_logs(container_id)
+    # Get runtime type from query params
+    runtime = request.args.get('runtime', 'docker')
+    
+    if runtime == 'mini':
+        logs = mini_docker_manager.get_container_logs(container_id)
+    else:
+        logs = container_manager.get_container_logs(container_id)
+        
     return jsonify(logs)
 
 @app.route('/api/containers/create', methods=['POST'])
 def create_container():
     data = request.get_json()
-    result = container_manager.create_container(
-        image=data.get('image'),
-        name=data.get('name'),
-        ports=data.get('ports', {}),
-        cpu_limit=data.get('cpu_limit'),
-        memory_limit=data.get('memory_limit'),
-        gpu=data.get('gpu', False)
-    )
+    
+    # Get runtime type from request (default to docker)
+    runtime = data.get('runtime', 'docker')
+    
+    if runtime == 'mini':
+        result = mini_docker_manager.create_container(
+            image=data.get('image', 'busybox'),
+            name=data.get('name'),
+            cpu_limit=data.get('cpu_limit'),
+            memory_limit=data.get('memory_limit')
+        )
+    else:
+        result = container_manager.create_container(
+            image=data.get('image'),
+            name=data.get('name'),
+            ports=data.get('ports', {}),
+            cpu_limit=data.get('cpu_limit'),
+            memory_limit=data.get('memory_limit'),
+            gpu=data.get('gpu', False)
+        )
+    
     return jsonify(result)
 
 @app.route('/api/volumes', methods=['GET'])

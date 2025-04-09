@@ -1,80 +1,63 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { ContainerList, Container } from '@/components/dashboard/ContainerList';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
-
-// Mock container data for development - in a real app, this would come from an API
-const mockContainers: Container[] = [
-  {
-    id: 'c1',
-    name: 'nginx-web',
-    image: 'nginx:latest',
-    status: 'running',
-    created: Date.now() - 86400000,
-    cpu: 2.4,
-    memory: 64.5,
-    ports: ['80:80']
-  },
-  {
-    id: 'c2',
-    name: 'postgres-db',
-    image: 'postgres:14',
-    status: 'running',
-    created: Date.now() - 172800000,
-    cpu: 5.7,
-    memory: 256.8,
-    ports: ['5432:5432']
-  },
-  {
-    id: 'c3',
-    name: 'redis-cache',
-    image: 'redis:alpine',
-    status: 'exited',
-    created: Date.now() - 259200000,
-    cpu: 0,
-    memory: 0,
-    ports: ['6379:6379']
-  },
-  {
-    id: 'c4',
-    name: 'mongo-db',
-    image: 'mongo:5',
-    status: 'exited',
-    created: Date.now() - 345600000,
-    cpu: 0,
-    memory: 0,
-    ports: ['27017:27017']
-  },
-];
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { fetchContainers, startContainer, stopContainer, deleteContainer } from '@/services/api';
+import { useQuery } from '@tanstack/react-query';
+import CreateContainerDialog from '@/components/containers/CreateContainerDialog';
 
 const Containers = () => {
-  const [containers, setContainers] = React.useState<Container[]>(mockContainers);
+  const [activeRuntime, setActiveRuntime] = useState<'docker' | 'mini'>('docker');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-  // Mock container actions
-  const handleStartContainer = (id: string) => {
-    setContainers(prev => prev.map(container => 
-      container.id === id ? { ...container, status: 'running', cpu: 1.5, memory: 45 } : container
-    ));
-    toast.success(`Container ${id} started successfully`);
+  // Query containers based on active runtime
+  const { data: containers = [], refetch } = useQuery({
+    queryKey: ['containers', activeRuntime],
+    queryFn: () => fetchContainers(activeRuntime),
+    refetchInterval: 5000
+  });
+
+  // Handle container actions
+  const handleStartContainer = async (id: string) => {
+    try {
+      await startContainer(id, activeRuntime);
+      toast.success(`Container ${id} started successfully`);
+      refetch();
+    } catch (error) {
+      console.error('Failed to start container:', error);
+      toast.error('Failed to start container');
+    }
   };
 
-  const handleStopContainer = (id: string) => {
-    setContainers(prev => prev.map(container => 
-      container.id === id ? { ...container, status: 'exited', cpu: 0, memory: 0 } : container
-    ));
-    toast.success(`Container ${id} stopped successfully`);
+  const handleStopContainer = async (id: string) => {
+    try {
+      await stopContainer(id, activeRuntime);
+      toast.success(`Container ${id} stopped successfully`);
+      refetch();
+    } catch (error) {
+      console.error('Failed to stop container:', error);
+      toast.error('Failed to stop container');
+    }
   };
 
-  const handleDeleteContainer = (id: string) => {
-    setContainers(prev => prev.filter(container => container.id !== id));
-    toast.success(`Container ${id} removed successfully`);
+  const handleDeleteContainer = async (id: string) => {
+    try {
+      await deleteContainer(id, activeRuntime);
+      toast.success(`Container ${id} removed successfully`);
+      refetch();
+    } catch (error) {
+      console.error('Failed to delete container:', error);
+      toast.error('Failed to delete container');
+    }
   };
 
   const handleViewLogs = (id: string) => {
     toast.info(`Viewing logs for container ${id}`);
+    // In a real app, navigate to logs page or show logs modal
   };
 
   return (
@@ -82,20 +65,57 @@ const Containers = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Container Management</h1>
-          <Button className="flex items-center gap-2">
+          <Button 
+            className="flex items-center gap-2"
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
             <Plus className="h-4 w-4" />
             New Container
           </Button>
         </div>
         
-        <ContainerList 
-          containers={containers}
-          onStart={handleStartContainer}
-          onStop={handleStopContainer}
-          onDelete={handleDeleteContainer}
-          onViewLogs={handleViewLogs}
-        />
+        <Tabs
+          defaultValue="docker"
+          value={activeRuntime}
+          onValueChange={(value) => setActiveRuntime(value as 'docker' | 'mini')}
+          className="w-full"
+        >
+          <TabsList className="grid w-[400px] grid-cols-2">
+            <TabsTrigger value="docker">Docker Engine</TabsTrigger>
+            <TabsTrigger value="mini">Mini Docker</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="docker" className="mt-4">
+            <ContainerList 
+              containers={containers as Container[]}
+              onStart={handleStartContainer}
+              onStop={handleStopContainer}
+              onDelete={handleDeleteContainer}
+              onViewLogs={handleViewLogs}
+            />
+          </TabsContent>
+          
+          <TabsContent value="mini" className="mt-4">
+            <ContainerList 
+              containers={containers as Container[]}
+              onStart={handleStartContainer}
+              onStop={handleStopContainer}
+              onDelete={handleDeleteContainer}
+              onViewLogs={handleViewLogs}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
+
+      <CreateContainerDialog 
+        open={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        runtime={activeRuntime}
+        onSuccess={() => {
+          setIsCreateDialogOpen(false);
+          refetch();
+        }}
+      />
     </MainLayout>
   );
 };

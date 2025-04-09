@@ -95,20 +95,21 @@ const apiRequest = async (endpoint: string, method = 'GET', body?: any) => {
   }
 };
 
-// Container API functions
-export const fetchContainers = () => apiRequest('/containers');
+// Container API functions with runtime support
+export const fetchContainers = (runtime = 'docker') => 
+  apiRequest(`/containers?runtime=${runtime}`);
 
-export const startContainer = (id: string) => 
-  apiRequest(`/containers/${id}/start`, 'POST');
+export const startContainer = (id: string, runtime = 'docker') => 
+  apiRequest(`/containers/${id}/start`, 'POST', { runtime });
 
-export const stopContainer = (id: string) => 
-  apiRequest(`/containers/${id}/stop`, 'POST');
+export const stopContainer = (id: string, runtime = 'docker') => 
+  apiRequest(`/containers/${id}/stop`, 'POST', { runtime });
 
-export const deleteContainer = (id: string) => 
-  apiRequest(`/containers/${id}/delete`, 'DELETE');
+export const deleteContainer = (id: string, runtime = 'docker') => 
+  apiRequest(`/containers/${id}/delete?runtime=${runtime}`, 'DELETE');
 
-export const fetchContainerLogs = (id: string) => 
-  apiRequest(`/containers/${id}/logs`);
+export const fetchContainerLogs = (id: string, runtime = 'docker') => 
+  apiRequest(`/containers/${id}/logs?runtime=${runtime}`);
 
 export const createContainer = (data: {
   image: string;
@@ -117,6 +118,7 @@ export const createContainer = (data: {
   cpu_limit?: number;
   memory_limit?: number;
   gpu?: boolean;
+  runtime?: 'docker' | 'mini';
 }) => apiRequest('/containers/create', 'POST', data);
 
 // Volume API functions
