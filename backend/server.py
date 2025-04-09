@@ -6,19 +6,54 @@ import eventlet
 import json
 import time
 import threading
+import platform
 
 from monitor import SystemMonitor
 from container_utils import ContainerManager
-from mini_docker_utils import mini_docker_manager
 
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
+# Check if running on Windows
+is_windows = platform.system() == "Windows"
+
 # Initialize monitoring and container management
 system_monitor = SystemMonitor()
 container_manager = ContainerManager()
+
+# Initialize mini_docker_manager only on Linux
+mini_docker_manager = None
+if not is_windows:
+    # Only import and initialize on Linux
+    try:
+        from mini_docker_utils import mini_docker_manager
+    except ImportError:
+        print("Warning: Mini Docker runtime not available on this platform")
+else:
+    print("Running on Windows: Mini Docker runtime will be limited to API compatibility only")
+    # Define a dummy mini_docker_manager for Windows compatibility
+    class DummyMiniDockerManager:
+        def list_containers(self):
+            return {"containers": [], "message": "Mini Docker runtime not available on Windows"}
+        
+        def create_container(self, **kwargs):
+            return {"success": False, "message": "Mini Docker runtime not available on Windows", "container_id": None}
+        
+        def start_container(self, container_id):
+            return {"success": False, "message": "Mini Docker runtime not available on Windows"}
+        
+        def stop_container(self, container_id):
+            return {"success": False, "message": "Mini Docker runtime not available on Windows"}
+        
+        def delete_container(self, container_id):
+            return {"success": False, "message": "Mini Docker runtime not available on Windows"}
+        
+        def get_container_logs(self, container_id):
+            return {"logs": "", "message": "Mini Docker runtime not available on Windows"}
+    
+    mini_docker_manager = DummyMiniDockerManager()
 
 # Store historical data (last 60 seconds, 1 sample per second)
 history_buffer = {
@@ -52,7 +87,12 @@ def background_monitoring():
     while True:
         system_stats = system_monitor.get_stats()
         docker_containers = container_manager.list_containers_with_stats()
-        mini_containers = mini_docker_manager.list_containers()
+        
+        # Get mini containers if not on Windows
+        if mini_docker_manager:
+            mini_containers = mini_docker_manager.list_containers()
+        else:
+            mini_containers = {"containers": []}
         
         # Update history
         update_history(system_stats)
@@ -64,26 +104,7 @@ def background_monitoring():
         
         eventlet.sleep(1)
 
-# API Routes
-@app.route('/api/cpu', methods=['GET'])
-def get_cpu():
-    return jsonify(system_monitor.get_cpu_stats())
-
-@app.route('/api/memory', methods=['GET'])
-def get_memory():
-    return jsonify(system_monitor.get_memory_stats())
-
-@app.route('/api/gpu', methods=['GET'])
-def get_gpu():
-    return jsonify(system_monitor.get_gpu_stats())
-
-@app.route('/api/disk', methods=['GET'])
-def get_disk():
-    return jsonify(system_monitor.get_disk_stats())
-
-@app.route('/api/history', methods=['GET'])
-def get_history():
-    return jsonify(history_buffer)
+# ... keep existing code (API routes for CPU, memory, GPU, disk, and history)
 
 # Docker container routes
 @app.route('/api/containers', methods=['GET'])
@@ -92,7 +113,10 @@ def get_containers():
     runtime = request.args.get('runtime', 'docker')
     
     if runtime == 'mini':
-        return jsonify(mini_docker_manager.list_containers())
+        if mini_docker_manager:
+            return jsonify(mini_docker_manager.list_containers())
+        else:
+            return jsonify({"containers": [], "message": "Mini Docker runtime not available on this platform"})
     else:
         return jsonify(container_manager.list_containers())
 
@@ -103,7 +127,10 @@ def start_container(container_id):
     runtime = data.get('runtime', 'docker')
     
     if runtime == 'mini':
-        result = mini_docker_manager.start_container(container_id)
+        if mini_docker_manager:
+            result = mini_docker_manager.start_container(container_id)
+        else:
+            result = {"success": False, "message": "Mini Docker runtime not available on this platform"}
     else:
         result = container_manager.start_container(container_id)
         
@@ -116,7 +143,10 @@ def stop_container(container_id):
     runtime = data.get('runtime', 'docker')
     
     if runtime == 'mini':
-        result = mini_docker_manager.stop_container(container_id)
+        if mini_docker_manager:
+            result = mini_docker_manager.stop_container(container_id)
+        else:
+            result = {"success": False, "message": "Mini Docker runtime not available on this platform"}
     else:
         result = container_manager.stop_container(container_id)
         
@@ -128,7 +158,10 @@ def delete_container(container_id):
     runtime = request.args.get('runtime', 'docker')
     
     if runtime == 'mini':
-        result = mini_docker_manager.delete_container(container_id)
+        if mini_docker_manager:
+            result = mini_docker_manager.delete_container(container_id)
+        else:
+            result = {"success": False, "message": "Mini Docker runtime not available on this platform"}
     else:
         result = container_manager.delete_container(container_id)
         
@@ -140,7 +173,10 @@ def get_logs(container_id):
     runtime = request.args.get('runtime', 'docker')
     
     if runtime == 'mini':
-        logs = mini_docker_manager.get_container_logs(container_id)
+        if mini_docker_manager:
+            logs = mini_docker_manager.get_container_logs(container_id)
+        else:
+            logs = {"logs": "", "message": "Mini Docker runtime not available on this platform"}
     else:
         logs = container_manager.get_container_logs(container_id)
         
@@ -154,12 +190,15 @@ def create_container():
     runtime = data.get('runtime', 'docker')
     
     if runtime == 'mini':
-        result = mini_docker_manager.create_container(
-            image=data.get('image', 'busybox'),
-            name=data.get('name'),
-            cpu_limit=data.get('cpu_limit'),
-            memory_limit=data.get('memory_limit')
-        )
+        if mini_docker_manager:
+            result = mini_docker_manager.create_container(
+                image=data.get('image', 'busybox'),
+                name=data.get('name'),
+                cpu_limit=data.get('cpu_limit'),
+                memory_limit=data.get('memory_limit')
+            )
+        else:
+            result = {"success": False, "message": "Mini Docker runtime not available on this platform", "container_id": None}
     else:
         result = container_manager.create_container(
             image=data.get('image'),
@@ -172,14 +211,7 @@ def create_container():
     
     return jsonify(result)
 
-@app.route('/api/volumes', methods=['GET'])
-def get_volumes():
-    return jsonify(container_manager.list_volumes())
-
-@app.route('/api/volumes/<volume_id>', methods=['DELETE'])
-def delete_volume(volume_id):
-    result = container_manager.delete_volume(volume_id)
-    return jsonify({"success": result})
+# ... keep existing code (volume management routes)
 
 if __name__ == '__main__':
     # Start background monitoring thread

@@ -7,6 +7,7 @@ const API_BASE = 'http://localhost:5000/api';
 // WebSocket connection
 let socket: WebSocket | null = null;
 const listeners = new Map();
+let reconnectTimer: number | null = null;
 
 // Initialize WebSocket connection
 export const initializeWebSocket = (onConnect?: () => void) => {
@@ -18,6 +19,10 @@ export const initializeWebSocket = (onConnect?: () => void) => {
   
   socket.onopen = () => {
     console.log('WebSocket connection established');
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
     if (onConnect) onConnect();
   };
   
@@ -44,9 +49,12 @@ export const initializeWebSocket = (onConnect?: () => void) => {
   socket.onclose = () => {
     console.log('WebSocket connection closed');
     // Try to reconnect after 5 seconds
-    setTimeout(() => {
-      initializeWebSocket();
-    }, 5000);
+    if (!reconnectTimer) {
+      reconnectTimer = window.setTimeout(() => {
+        initializeWebSocket();
+        reconnectTimer = null;
+      }, 5000);
+    }
   };
   
   return socket;
@@ -87,7 +95,15 @@ const apiRequest = async (endpoint: string, method = 'GET', body?: any) => {
       throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    
+    // Handle platform-specific messages
+    if (data.message && data.message.includes("not available on")) {
+      console.warn(data.message);
+      toast.warning(data.message);
+    }
+    
+    return data;
   } catch (error) {
     console.error(`Error in API request to ${endpoint}:`, error);
     toast.error(`API request failed: ${(error as Error).message}`);
