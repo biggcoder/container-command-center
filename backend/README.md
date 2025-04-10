@@ -14,13 +14,28 @@ This is the Python backend for ContainerOS, a Docker visualization and managemen
 
 1. Install Python dependencies:
    ```
+   # Create and activate a virtual environment (recommended)
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   
+   # Install all requirements
    pip install -r requirements.txt
+   
+   # If you encounter issues, try installing packages individually:
+   pip install flask==2.2.3
+   pip install flask-socketio==5.3.3
+   pip install flask-cors==3.0.10
+   pip install eventlet==0.33.3
+   pip install psutil==5.9.4
+   pip install docker==6.1.1
+   pip install python-dotenv==1.0.0
    ```
 
 2. Compile the Mini Docker runtime:
    ```
    cd mini_docker && make
    ```
+   Note: This step is only required on Linux systems. On Windows, Mini Docker will operate in compatibility mode.
 
 3. Make sure Docker is running and accessible to your user
 
@@ -84,3 +99,10 @@ Features:
 - Integration with the ContainerOS frontend
 
 Note: This is a simplified implementation for educational purposes and lacks many features of production container runtimes.
+
+## Troubleshooting
+
+If you see "No module named 'flask'" or other import errors:
+1. Make sure your virtual environment is activated
+2. Try installing packages individually as shown in the installation section
+3. Check if pip is properly installed and up-to-date

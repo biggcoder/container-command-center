@@ -39,6 +39,17 @@ This guide will help you set up ContainerOS on a Windows system.
    ```
    pip install -r requirements.txt
    ```
+   
+   If you encounter any issues, you can install each dependency individually:
+   ```
+   pip install flask==2.2.3
+   pip install flask-socketio==5.3.3
+   pip install flask-cors==3.0.10
+   pip install eventlet==0.33.3
+   pip install psutil==5.9.4
+   pip install docker==6.1.1
+   pip install python-dotenv==1.0.0
+   ```
 
 5. Start the backend server:
    ```
@@ -80,10 +91,11 @@ This guide will help you set up ContainerOS on a Windows system.
 
 ## Troubleshooting
 
-1. If the backend fails to start:
-   - Check that Docker Desktop is running
-   - Ensure Python and required dependencies are installed
-   - Look for error messages in the console
+1. If the backend fails to start with "No module named 'flask'" or similar errors:
+   - Make sure your virtual environment is activated (you should see `(venv)` at the start of your command prompt)
+   - Try installing packages individually as shown in step 4 above
+   - Verify pip is properly installed with `pip --version`
+   - Try upgrading pip: `python -m pip install --upgrade pip`
 
 2. If the frontend fails to connect:
    - Verify the backend server is running
